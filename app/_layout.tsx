@@ -1,5 +1,5 @@
-import React from 'react';
-import { Stack } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { useFonts } from 'expo-font';
 import {
   PlayfairDisplay_400Regular,
@@ -15,6 +15,30 @@ import {
 import { View, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { ActivitiesProvider } from '@/context/ActivitiesContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { session, loading } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (loading) return;
+    const inAuthGroup = segments[0] === 'login';
+    if (!session && !inAuthGroup) router.replace('/login');
+    if (session && inAuthGroup) router.replace('/(tabs)');
+  }, [session, loading, segments]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg }}>
+        <ActivityIndicator color={Colors.primary} />
+      </View>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -36,10 +60,15 @@ export default function RootLayout() {
   }
 
   return (
-    <ActivitiesProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-      </Stack>
-    </ActivitiesProvider>
+    <AuthProvider>
+      <ActivitiesProvider>
+        <AuthGate>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="login" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </AuthGate>
+      </ActivitiesProvider>
+    </AuthProvider>
   );
 }

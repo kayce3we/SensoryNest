@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Colors } from '@/constants/theme';
+import { extractActivitiesFromPDF, type ExtractedActivity } from '@/lib/ai-extraction';
+import { createActivity, scheduleActivity } from '@/lib/activities';
+import { useAuth } from '@/context/AuthContext';
 
-const STEPS = [
+const PROCESSING_STEPS = [
   'Uploading file',
   'Extracting text',
   'Identifying activities',
@@ -12,64 +17,126 @@ const STEPS = [
   'Suggesting times',
 ];
 
-const EXTRACTED = [
-  { name: 'Weighted blanket squeeze', system: 'Proprioceptive' },
-  { name: 'Mini trampoline jumps', system: 'Vestibular' },
-  { name: 'Playdough squeeze & roll', system: 'Tactile' },
-  { name: 'Bear crawl hallway', system: 'Proprioceptive' },
-  { name: 'Calm music & headphones', system: 'Auditory' },
-];
-
 export default function UploadScreen() {
   const insets = useSafeAreaInsets();
+  const { userId } = useAuth();
   const [phase, setPhase] = useState<'upload' | 'processing' | 'review'>('upload');
   const [stepDone, setStepDone] = useState(0);
-  const [selected, setSelected] = useState<boolean[]>(EXTRACTED.map(() => true));
+  const [extracted, setExtracted] = useState<ExtractedActivity[]>([]);
+  const [selected, setSelected] = useState<boolean[]>([]);
+  const [saving, setSaving] = useState(false);
   const spinAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (phase !== 'processing') return;
-    const interval = setInterval(() => {
-      setStepDone(s => {
-        if (s >= STEPS.length) { clearInterval(interval); setPhase('review'); return s; }
-        return s + 1;
-      });
-    }, 700);
-    return () => clearInterval(interval);
-  }, [phase]);
-
-  useEffect(() => {
-    const spin = Animated.loop(Animated.timing(spinAnim, { toValue: 1, duration: 800, useNativeDriver: true }));
+    const spin = Animated.loop(
+      Animated.timing(spinAnim, { toValue: 1, duration: 800, useNativeDriver: true })
+    );
     spin.start();
     return () => spin.stop();
   }, []);
 
-  const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const spinInterpolate = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+
+  async function handlePickFile() {
+    const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const file = result.assets[0];
+    setPhase('processing');
+    setStepDone(0);
+
+    // Animate steps while extracting
+    const interval = setInterval(() => {
+      setStepDone(s => (s < PROCESSING_STEPS.length - 1 ? s + 1 : s));
+    }, 700);
+
+    try {
+      const apiKey = process.env.EXPO_PUBLIC_CLAUDE_API_KEY;
+      if (!apiKey) throw new Error('EXPO_PUBLIC_CLAUDE_API_KEY is not set in .env');
+
+      const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
+      const activities = await extractActivitiesFromPDF(base64, apiKey);
+
+      clearInterval(interval);
+      setStepDone(PROCESSING_STEPS.length);
+      setExtracted(activities);
+      setSelected(activities.map(() => true));
+      setTimeout(() => setPhase('review'), 400);
+    } catch (err: any) {
+      clearInterval(interval);
+      setPhase('upload');
+      Alert.alert('Extraction failed', err.message);
+    }
+  }
+
+  async function handleSave() {
+    if (!userId) return;
+    setSaving(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const toSave = extracted.filter((_, i) => selected[i]);
+      for (let i = 0; i < toSave.length; i++) {
+        const a = toSave[i];
+        const activity = await createActivity({
+          user_id: userId,
+          name: a.name,
+          description: a.description,
+          sensory_system: a.sensory_system,
+          source: 'ot',
+          duration: a.duration,
+          is_library: false,
+        });
+        await scheduleActivity(userId, activity.id, today, null, i);
+      }
+      setPhase('upload');
+      setExtracted([]);
+      Alert.alert('Saved!', `${toSave.length} activities added to today's diet.`);
+    } catch (err: any) {
+      Alert.alert('Save failed', err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (phase === 'review') {
     const count = selected.filter(Boolean).length;
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Review Activities</Text>
-        </View>
+        <View style={styles.header}><Text style={styles.title}>Review Activities</Text></View>
         <View style={{ flex: 1, padding: 16 }}>
+          <StepIndicator current={2} />
           <View style={styles.foundBanner}>
-            <Text style={styles.foundText}>We found {EXTRACTED.length} activities</Text>
+            <Text style={styles.foundText}>We found {extracted.length} activities</Text>
           </View>
-          {EXTRACTED.map((a, i) => (
-            <TouchableOpacity key={i} style={styles.reviewRow} onPress={() => setSelected(s => { const n = [...s]; n[i] = !n[i]; return n; })} activeOpacity={0.8}>
+          {extracted.map((a, i) => (
+            <TouchableOpacity
+              key={i}
+              style={styles.reviewRow}
+              onPress={() => setSelected(s => { const n = [...s]; n[i] = !n[i]; return n; })}
+              activeOpacity={0.8}
+            >
               <View style={[styles.checkbox, selected[i] && styles.checkboxChecked]}>
-                {selected[i] && <Svg width={12} height={12} viewBox="0 0 12 12" fill="none"><Path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></Svg>}
+                {selected[i] && (
+                  <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
+                    <Path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+                  </Svg>
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.reviewName}>{a.name}</Text>
-                <View style={[styles.reviewTag, { backgroundColor: '#EDF2EE' }]}><Text style={{ fontSize: 10, color: Colors.dark, fontWeight: '600' }}>{a.system}</Text></View>
+                <Text style={styles.reviewSys}>{a.sensory_system} · {a.duration} min</Text>
               </View>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity style={styles.saveBtn} activeOpacity={0.8}>
-            <Text style={styles.saveBtnText}>Save {count} activities to my diet</Text>
+          <TouchableOpacity
+            style={[styles.saveBtn, (saving || count === 0) && { opacity: 0.5 }]}
+            onPress={handleSave}
+            disabled={saving || count === 0}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.saveBtnText}>
+              {saving ? 'Saving…' : `Save ${count} activities to my diet`}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -83,21 +150,29 @@ export default function UploadScreen() {
         <View style={{ flex: 1, padding: 16 }}>
           <StepIndicator current={1} />
           <View style={{ marginTop: 24 }}>
-            {STEPS.map((step, i) => {
+            {PROCESSING_STEPS.map((step, i) => {
               const done = i < stepDone;
               const active = i === stepDone;
               return (
                 <View key={i} style={[styles.stepRow, { opacity: i > stepDone ? 0.4 : 1 }]}>
-                  <View style={styles.stepIndicator}>
+                  <View style={styles.stepIndicatorWrap}>
                     {done ? (
-                      <View style={styles.stepDone}><Svg width={12} height={12} viewBox="0 0 12 12" fill="none"><Path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></Svg></View>
+                      <View style={styles.stepDone}>
+                        <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
+                          <Path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+                        </Svg>
+                      </View>
                     ) : active ? (
-                      <Animated.View style={[styles.stepActive, { transform: [{ rotate: spin }] }]} />
+                      <Animated.View style={[styles.stepActive, { transform: [{ rotate: spinInterpolate }] }]} />
                     ) : (
                       <View style={styles.stepPending} />
                     )}
                   </View>
-                  <Text style={[styles.stepLabel, done && { color: Colors.dark }, active && { color: Colors.amber, fontWeight: '600' }]}>{step}</Text>
+                  <Text style={[
+                    styles.stepLabel,
+                    done && { color: Colors.dark },
+                    active && { color: Colors.amber, fontWeight: '600' },
+                  ]}>{step}</Text>
                 </View>
               );
             })}
@@ -112,13 +187,13 @@ export default function UploadScreen() {
       <View style={styles.header}><Text style={styles.title}>Upload OT Plan</Text></View>
       <View style={{ flex: 1, padding: 16, justifyContent: 'center' }}>
         <StepIndicator current={0} />
-        <TouchableOpacity style={styles.dropzone} activeOpacity={0.8} onPress={() => setPhase('processing')}>
+        <TouchableOpacity style={styles.dropzone} onPress={handlePickFile} activeOpacity={0.85}>
           <Svg width={40} height={40} viewBox="0 0 40 40" fill="none">
             <Path d="M20 28V16M14 22l6-6 6 6" stroke={Colors.primary} strokeWidth="2" strokeLinecap="round" />
             <Path d="M8 30h24" stroke={Colors.primary} strokeWidth="2" strokeLinecap="round" />
           </Svg>
           <Text style={styles.dropzoneTitle}>Upload your OT plan</Text>
-          <Text style={styles.dropzoneSub}>PDF, DOC, or DOCX — up to 10 MB</Text>
+          <Text style={styles.dropzoneSub}>Tap to choose a PDF</Text>
           <View style={styles.chooseBtn}><Text style={styles.chooseBtnText}>Choose file</Text></View>
         </TouchableOpacity>
         <View style={styles.privacyNote}>
@@ -141,8 +216,10 @@ function StepIndicator({ current }: { current: number }) {
         <React.Fragment key={s}>
           <View style={styles.stepDotWrap}>
             <View style={[styles.stepDot2, i <= current && styles.stepDot2Active]}>
-              {i < current && <Svg width={12} height={12} viewBox="0 0 12 12" fill="none"><Path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></Svg>}
-              {i >= current && <Text style={{ fontSize: 11, color: i === current ? '#fff' : Colors.textSoft, fontWeight: '600' }}>{i + 1}</Text>}
+              {i < current
+                ? <Svg width={12} height={12} viewBox="0 0 12 12" fill="none"><Path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></Svg>
+                : <Text style={{ fontSize: 11, color: i === current ? '#fff' : Colors.textSoft, fontWeight: '600' }}>{i + 1}</Text>
+              }
             </View>
             <Text style={[styles.stepDotLabel, i === current && { color: Colors.dark, fontWeight: '600' }]}>{s}</Text>
           </View>
@@ -165,7 +242,7 @@ const styles = StyleSheet.create({
   privacyNote: { flexDirection: 'row', gap: 10, backgroundColor: Colors.light, borderRadius: 12, padding: 14, alignItems: 'flex-start' },
   privacyText: { fontSize: 12, color: Colors.textMid, flex: 1, lineHeight: 18, fontFamily: 'PlusJakartaSans_400Regular' },
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  stepIndicator: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  stepIndicatorWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   stepDone: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   stepActive: { width: 22, height: 22, borderRadius: 11, borderWidth: 2.5, borderColor: Colors.amber, borderTopColor: 'transparent' },
   stepPending: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: Colors.border },
@@ -181,8 +258,8 @@ const styles = StyleSheet.create({
   reviewRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, padding: 14, marginBottom: 8 },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  reviewName: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: 4, fontFamily: 'PlusJakartaSans_600SemiBold' },
-  reviewTag: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
+  reviewName: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: 2, fontFamily: 'PlusJakartaSans_600SemiBold' },
+  reviewSys: { fontSize: 11, color: Colors.textSoft, fontFamily: 'PlusJakartaSans_400Regular' },
   saveBtn: { marginTop: 16, backgroundColor: Colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
 });
