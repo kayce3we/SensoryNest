@@ -125,12 +125,11 @@ export default function SettingsScreen() {
       })
       .eq('id', userId);
 
-    // Save migration columns separately — silently skip if columns don't exist yet
-    await supabase
-      .from('profiles')
-      .update({ sensory_systems: sensoryProfile, reminder_offset: reminderOffset } as any)
-      .eq('id', userId)
-      .then(() => {});
+    // Save extra columns via RPC to bypass PostgREST schema cache
+    await supabase.rpc('save_profile_extras', {
+      p_sensory_systems: sensoryProfile,
+      p_reminder_offset: reminderOffset,
+    });
 
     setSaving(false);
     if (error) {
