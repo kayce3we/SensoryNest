@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
-  StyleSheet, Pressable, ActivityIndicator, Platform,
+  StyleSheet, Pressable, ActivityIndicator, Platform, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -38,7 +38,7 @@ function ChevronDown({ rotated }: { rotated: boolean }) {
 
 // ── Activity card ─────────────────────────────────────────────────────────────
 function ActivityCard({
-  activity, index, total, editOrder, otIndex, onMarkDone, onUnmarkDone, onMoveUp, onMoveDown,
+  activity, index, total, editOrder, otIndex, onMarkDone, onUnmarkDone, onDelete, onMoveUp, onMoveDown,
 }: {
   activity: Activity;
   index: number;
@@ -47,6 +47,7 @@ function ActivityCard({
   otIndex: number;
   onMarkDone: () => void;
   onUnmarkDone: () => void;
+  onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
 }) {
@@ -115,6 +116,16 @@ function ActivityCard({
                   <Text style={styles.otBadgeText}>OT #{otIndex + 1}</Text>
                 </View>
               )}
+              <TouchableOpacity
+                onPress={(e) => { e.stopPropagation?.(); onDelete(); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.deleteBtn}
+                activeOpacity={0.7}
+              >
+                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                  <Path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke={Colors.textSoft} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -223,7 +234,7 @@ function AddActivitySheet({ visible, onClose, onBrowse, onCreate }: {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { activities, loading, refresh, markDone, unmarkDone, moveUp, moveDown, restoreOrder } = useActivities();
+  const { activities, loading, refresh, markDone, unmarkDone, deleteScheduled, moveUp, moveDown, restoreOrder } = useActivities();
   const [editOrder, setEditOrder] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
   const [otOrder] = useState(() => activities.map(a => a.scheduledId));
@@ -321,6 +332,14 @@ export default function HomeScreen() {
               otIndex={otOrder.indexOf(act.scheduledId)}
               onMarkDone={() => markDone(act.scheduledId)}
               onUnmarkDone={() => unmarkDone(act.scheduledId)}
+              onDelete={() => Alert.alert(
+                'Remove activity',
+                `Remove "${act.name}" from today's diet?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Remove', style: 'destructive', onPress: () => deleteScheduled(act.scheduledId) },
+                ]
+              )}
               onMoveUp={() => moveUp(i)}
               onMoveDown={() => moveDown(i)}
             />
@@ -588,6 +607,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     flexShrink: 0,
+  },
+  deleteBtn: {
+    padding: 2,
+    marginLeft: 2,
   },
   otBadge: {
     backgroundColor: Colors.light,
