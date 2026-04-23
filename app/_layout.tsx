@@ -68,6 +68,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="settings" />
             <Stack.Screen name="schedule" />
+            <Stack.Screen name="new-activity" />
           </Stack>
         </AuthGate>
       </ActivitiesProvider>
