@@ -68,7 +68,7 @@ export default function SettingsScreen() {
     if (!userId) return;
     supabase
       .from('profiles')
-      .select('child_name, child_age, child_notes, ot_name, ot_email, ot_next_session, reminders_enabled')
+      .select('child_name, child_age, child_notes, ot_name, ot_email, ot_next_session, sensory_systems, reminders_enabled')
       .eq('id', userId)
       .single()
       .then(({ data }) => {
@@ -80,6 +80,9 @@ export default function SettingsScreen() {
           setOtEmail(data.ot_email ?? '');
           setOtNextSession(data.ot_next_session ?? '');
           setRemindersEnabled(data.reminders_enabled ?? true);
+          if (data.sensory_systems?.length) {
+            setSensoryProfile(data.sensory_systems as SensorySystem[]);
+          }
         }
         setLoadingProfile(false);
       });
@@ -103,6 +106,7 @@ export default function SettingsScreen() {
         ot_name: otName || null,
         ot_email: otEmail || null,
         ot_next_session: otNextSession || null,
+        sensory_systems: sensoryProfile,
         reminders_enabled: remindersEnabled,
         updated_at: new Date().toISOString(),
       })

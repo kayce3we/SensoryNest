@@ -13,6 +13,7 @@ create table public.profiles (
   ot_email text,
   ot_next_session date,
   expo_push_token text,
+  sensory_systems text[] default '{}',
   reminders_enabled boolean default true,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
