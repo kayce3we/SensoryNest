@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { Colors, SensoryColors, type SensorySystem } from '@/constants/theme';
 import { SensoryTag } from '@/components/ui/SensoryTag';
@@ -10,6 +11,20 @@ import { libraryActivities, myActivities, type LibraryActivity } from '@/constan
 const FILTERS = ['All', 'Proprioceptive', 'Tactile', 'Vestibular', 'Auditory', 'Visual', 'Interoceptive'] as const;
 
 function LibraryCard({ act, isMine }: { act: LibraryActivity; isMine?: boolean }) {
+  const router = useRouter();
+
+  function handleAddToDiet() {
+    router.push({
+      pathname: '/schedule',
+      params: {
+        name: act.name,
+        desc: act.desc ?? '',
+        system: act.system,
+        duration: String(act.duration),
+      },
+    });
+  }
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -22,7 +37,7 @@ function LibraryCard({ act, isMine }: { act: LibraryActivity; isMine?: boolean }
           <SensoryTag system={act.system} small />
           {isMine && <SourceBadge source="my" />}
         </View>
-        <TouchableOpacity style={styles.addBtn} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.addBtn} onPress={handleAddToDiet} activeOpacity={0.8}>
           <Text style={styles.addBtnText}>+ Add to diet</Text>
         </TouchableOpacity>
       </View>
