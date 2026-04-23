@@ -21,7 +21,7 @@ export async function extractActivitiesFromPDF(
     },
     body: JSON.stringify({
       model: 'claude-opus-4-7',
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [
         {
           role: 'user',
@@ -70,9 +70,16 @@ Extract all activities. Return only the JSON array, no other text.`,
   }
 
   const result = await response.json();
-  const text = result.content?.[0]?.text ?? '[]';
+  const text = result.content?.[0]?.text ?? '';
+
+  if (!text) throw new Error('Claude returned an empty response.');
 
   // Strip markdown code fences if present
   const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  return JSON.parse(clean) as ExtractedActivity[];
+
+  // Extract JSON array even if Claude added extra text around it
+  const match = clean.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('No activity list found in Claude response.');
+
+  return JSON.parse(match[0]) as ExtractedActivity[];
 }
