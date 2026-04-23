@@ -60,6 +60,7 @@ export default function SettingsScreen() {
   const [otNextSession, setOtNextSession] = useState('');
   const [sensoryProfile, setSensoryProfile] = useState<SensorySystem[]>([]);
   const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [reminderOffset, setReminderOffset] = useState('10 min before');
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -68,7 +69,7 @@ export default function SettingsScreen() {
     if (!userId) return;
     supabase
       .from('profiles')
-      .select('child_name, child_age, child_notes, ot_name, ot_email, ot_next_session, sensory_systems, reminders_enabled')
+      .select('child_name, child_age, child_notes, ot_name, ot_email, ot_next_session, sensory_systems, reminders_enabled, reminder_offset')
       .eq('id', userId)
       .single()
       .then(({ data }) => {
@@ -80,6 +81,7 @@ export default function SettingsScreen() {
           setOtEmail(data.ot_email ?? '');
           setOtNextSession(data.ot_next_session ?? '');
           setRemindersEnabled(data.reminders_enabled ?? true);
+          if (data.reminder_offset) setReminderOffset(data.reminder_offset);
           if (data.sensory_systems?.length) {
             setSensoryProfile(data.sensory_systems as SensorySystem[]);
           }
@@ -108,6 +110,7 @@ export default function SettingsScreen() {
         ot_next_session: otNextSession || null,
         sensory_systems: sensoryProfile,
         reminders_enabled: remindersEnabled,
+        reminder_offset: reminderOffset,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId);
@@ -213,11 +216,19 @@ export default function SettingsScreen() {
           </View>
           {remindersEnabled && (
             <View style={styles.reminderGrid}>
-              {['5 min before', '10 min before', '15 min before', 'At time'].map(opt => (
-                <TouchableOpacity key={opt} style={styles.reminderChip} activeOpacity={0.8}>
-                  <Text style={styles.reminderChipText}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
+              {['5 min before', '10 min before', '15 min before', 'At time'].map(opt => {
+                const active = reminderOffset === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    onPress={() => setReminderOffset(opt)}
+                    style={[styles.reminderChip, active && styles.reminderChipActive]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.reminderChipText, active && styles.reminderChipTextActive]}>{opt}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
         </View>
@@ -264,7 +275,9 @@ const styles = StyleSheet.create({
   switchSub: { fontSize: 12, color: Colors.textSoft, marginTop: 2, fontFamily: 'PlusJakartaSans_400Regular' },
   reminderGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   reminderChip: { borderRadius: 20, borderWidth: 1.5, borderColor: Colors.border, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: Colors.bg },
+  reminderChipActive: { backgroundColor: Colors.light, borderColor: Colors.primary },
   reminderChipText: { fontSize: 12, color: Colors.textMid, fontFamily: 'PlusJakartaSans_400Regular' },
+  reminderChipTextActive: { color: Colors.dark, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
   saveBtn: { marginTop: 24, backgroundColor: Colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveBtnDone: { backgroundColor: '#4CAF7D' },
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },

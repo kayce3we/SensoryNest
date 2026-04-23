@@ -15,6 +15,7 @@ create table public.profiles (
   expo_push_token text,
   sensory_systems text[] default '{}',
   reminders_enabled boolean default true,
+  reminder_offset text default '10 min before',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
