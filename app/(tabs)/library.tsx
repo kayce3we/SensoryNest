@@ -38,7 +38,8 @@ function LibraryCard({ act, isMine }: { act: LibraryActivity; isMine?: boolean }
       <View style={styles.cardFooter}>
         <View style={styles.tags}>
           <SensoryTag system={act.system} small />
-          {isMine && <SourceBadge source="my" />}
+          {act.source === 'my' && <SourceBadge source="my" />}
+          {act.source === 'ot' && <SourceBadge source="ot" />}
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={handleAddToDiet} activeOpacity={0.8}>
           <Text style={styles.addBtnText}>+ Add to diet</Text>
@@ -54,6 +55,7 @@ export default function LibraryScreen() {
   const { userId } = useAuth();
   const [filter, setFilter] = useState<typeof FILTERS[number]>('All');
   const [myActivities, setMyActivities] = useState<LibraryActivity[]>([]);
+  const [otActivities, setOtActivities] = useState<LibraryActivity[]>([]);
   const [loadingMine, setLoadingMine] = useState(true);
 
   useFocusEffect(useCallback(() => {
@@ -63,17 +65,19 @@ export default function LibraryScreen() {
       .from('activities')
       .select('id, name, description, sensory_system, duration, source')
       .eq('user_id', userId)
-      .eq('source', 'my')
+      .in('source', ['my', 'ot'])
       .order('created_at', { ascending: false })
       .then(({ data }) => {
-        setMyActivities((data ?? []).map((r: any) => ({
+        const mapped = (data ?? []).map((r: any) => ({
           id: r.id,
           name: r.name,
           desc: r.description ?? '',
           system: r.sensory_system as SensorySystem,
           duration: r.duration,
           source: r.source,
-        })));
+        }));
+        setMyActivities(mapped.filter(a => a.source === 'my'));
+        setOtActivities(mapped.filter(a => a.source === 'ot'));
         setLoadingMine(false);
       });
   }, [userId]));
@@ -85,6 +89,10 @@ export default function LibraryScreen() {
   const filteredMine = filter === 'All'
     ? myActivities
     : myActivities.filter(a => a.system === filter);
+
+  const filteredOt = filter === 'All'
+    ? otActivities
+    : otActivities.filter(a => a.system === filter);
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -138,10 +146,25 @@ export default function LibraryScreen() {
           </>
         )}
 
+        {/* OT Plan Activities */}
+        {(filter === 'All' || filteredOt.length > 0) && (
+          <>
+            <View style={[styles.sectionRow, { marginTop: 20 }]}>
+              <Text style={styles.sectionLabel}>From OT Plan</Text>
+              {loadingMine && <ActivityIndicator size="small" color={Colors.primary} />}
+            </View>
+            {!loadingMine && filteredOt.length === 0 ? (
+              <View style={styles.emptyMine}>
+                <Text style={styles.emptyMineText}>Upload an OT plan to see activities here</Text>
+              </View>
+            ) : (
+              filteredOt.map(a => <LibraryCard key={a.id} act={a} isMine />)
+            )}
+          </>
+        )}
+
         {/* Curated library */}
-        <Text style={[styles.sectionLabel, { marginTop: filteredMine.length > 0 || filter === 'All' ? 20 : 0 }]}>
-          Curated Library
-        </Text>
+        <Text style={[styles.sectionLabel, { marginTop: 20 }]}>Curated Library</Text>
         {filteredLibrary.map(a => <LibraryCard key={a.id} act={a} />)}
       </ScrollView>
     </View>
