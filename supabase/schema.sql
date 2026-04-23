@@ -84,8 +84,16 @@ create policy "Users see own and library activities"
   on public.activities for select
   using (auth.uid() = user_id or is_library = true);
 
-create policy "Users manage own activities"
-  on public.activities for insert update delete
+create policy "Users insert own activities"
+  on public.activities for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users update own activities"
+  on public.activities for update
+  using (auth.uid() = user_id);
+
+create policy "Users delete own activities"
+  on public.activities for delete
   using (auth.uid() = user_id);
 
 -- Scheduled activities: users only see their own

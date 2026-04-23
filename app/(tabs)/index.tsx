@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
-  StyleSheet, Pressable, Animated,
+  StyleSheet, Pressable, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Colors } from '@/constants/theme';
-import { useActivities } from '@/context/ActivitiesContext';
+import { useActivities, type Activity } from '@/context/ActivitiesContext';
 import { SensoryTag } from '@/components/ui/SensoryTag';
 import { SourceBadge } from '@/components/ui/SourceBadge';
 import { LogoMark } from '@/components/ui/LogoMark';
-import type { Activity } from '@/constants/data';
 
 // ── Settings gear icon ──────────────────────────────────────────────────────
 function GearIcon() {
@@ -217,13 +216,13 @@ function AddActivitySheet({ visible, onClose, onBrowse, onCreate }: {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { activities, markDone, moveUp, moveDown, restoreOrder } = useActivities();
+  const { activities, loading, refresh, markDone, moveUp, moveDown, restoreOrder } = useActivities();
   const [editOrder, setEditOrder] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
-  const [otOrder] = useState(() => activities.map(a => a.id));
+  const [otOrder] = useState(() => activities.map(a => a.scheduledId));
 
   const doneCount = activities.filter(a => a.status === 'done').length;
-  const isOtOrder = activities.map(a => a.id).join(',') === otOrder.join(',');
+  const isOtOrder = activities.map(a => a.scheduledId).join(',') === otOrder.join(',');
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -261,44 +260,65 @@ export default function HomeScreen() {
       </View>
 
       {/* Timeline */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Reorder status banner */}
-        {editOrder && !isOtOrder && (
-          <View style={styles.reorderWarning}>
-            <Text style={styles.reorderWarningText}>Order differs from OT's suggestion</Text>
-            <TouchableOpacity onPress={() => restoreOrder(otOrder)}>
-              <Text style={styles.restoreBtn}>Restore OT order</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {editOrder && isOtOrder && (
-          <View style={styles.reorderOk}>
-            <Svg width={14} height={14} viewBox="0 0 14 14" fill="none">
-              <Circle cx="7" cy="7" r="6" stroke={Colors.dark} strokeWidth="1.2" />
-              <Path d="M4.5 7l2 2 3-3" stroke={Colors.dark} strokeWidth="1.2" strokeLinecap="round" />
-            </Svg>
-            <Text style={styles.reorderOkText}>Following OT's suggested sequence</Text>
-          </View>
-        )}
-
-        {activities.map((act, i) => (
-          <ActivityCard
-            key={act.id}
-            activity={act}
-            index={i}
-            total={activities.length}
-            editOrder={editOrder}
-            otIndex={otOrder.indexOf(act.id)}
-            onMarkDone={() => markDone(act.id)}
-            onMoveUp={() => moveUp(i)}
-            onMoveDown={() => moveDown(i)}
-          />
-        ))}
-      </ScrollView>
+      {loading ? (
+        <View style={styles.emptyState}>
+          <ActivityIndicator color={Colors.primary} size="large" />
+        </View>
+      ) : activities.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Svg width={48} height={48} viewBox="0 0 44 44" fill="none">
+            <Path d="M6 30 Q22 8 38 30" stroke={Colors.primary} strokeWidth="3" fill="none" strokeLinecap="round" opacity={0.4} />
+            <Path d="M10 33 Q22 14 34 33" stroke={Colors.primary} strokeWidth="3" fill="none" strokeLinecap="round" opacity={0.7} />
+            <Path d="M14 36 Q22 20 30 36" stroke={Colors.dark} strokeWidth="3.5" fill="none" strokeLinecap="round" />
+            <Circle cx="22" cy="36" r="3.5" fill={Colors.dark} />
+          </Svg>
+          <Text style={styles.emptyTitle}>No activities yet</Text>
+          <Text style={styles.emptySub}>Upload an OT plan or browse the library to add activities to today's diet.</Text>
+          <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/(tabs)/upload')} activeOpacity={0.85}>
+            <Text style={styles.emptyBtnText}>Upload OT plan</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.emptyBtnOutline} onPress={() => router.push('/(tabs)/library')} activeOpacity={0.85}>
+            <Text style={styles.emptyBtnOutlineText}>Browse library</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {editOrder && !isOtOrder && (
+            <View style={styles.reorderWarning}>
+              <Text style={styles.reorderWarningText}>Order differs from OT's suggestion</Text>
+              <TouchableOpacity onPress={() => restoreOrder(otOrder)}>
+                <Text style={styles.restoreBtn}>Restore OT order</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {editOrder && isOtOrder && (
+            <View style={styles.reorderOk}>
+              <Svg width={14} height={14} viewBox="0 0 14 14" fill="none">
+                <Circle cx="7" cy="7" r="6" stroke={Colors.dark} strokeWidth="1.2" />
+                <Path d="M4.5 7l2 2 3-3" stroke={Colors.dark} strokeWidth="1.2" strokeLinecap="round" />
+              </Svg>
+              <Text style={styles.reorderOkText}>Following OT's suggested sequence</Text>
+            </View>
+          )}
+          {activities.map((act, i) => (
+            <ActivityCard
+              key={act.scheduledId}
+              activity={act}
+              index={i}
+              total={activities.length}
+              editOrder={editOrder}
+              otIndex={otOrder.indexOf(act.scheduledId)}
+              onMarkDone={() => markDone(act.scheduledId)}
+              onMoveUp={() => moveUp(i)}
+              onMoveDown={() => moveDown(i)}
+            />
+          ))}
+        </ScrollView>
+      )}
 
       {/* FAB */}
       {!editOrder && (
@@ -670,6 +690,58 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
     zIndex: 50,
+  },
+  // Empty state
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    fontFamily: 'PlayfairDisplay_700Bold',
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontSize: 13,
+    color: Colors.textSoft,
+    textAlign: 'center',
+    lineHeight: 20,
+    fontFamily: 'PlusJakartaSans_400Regular',
+  },
+  emptyBtn: {
+    marginTop: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    width: '100%',
+    alignItems: 'center',
+  },
+  emptyBtnText: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  emptyBtnOutline: {
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    width: '100%',
+    alignItems: 'center',
+  },
+  emptyBtnOutlineText: {
+    color: Colors.dark,
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
   // Bottom sheet
   backdrop: {

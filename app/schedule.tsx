@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { Colors } from '@/constants/theme';
 import { SensoryTag } from '@/components/ui/SensoryTag';
 import type { SensorySystem } from '@/constants/theme';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+import { useActivities } from '@/context/ActivitiesContext';
 
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const TIMES_OF_DAY = ['Morning', 'Pre-school', 'Midday', 'After-school', 'Evening', 'Bedtime'];
@@ -27,22 +30,87 @@ export default function ScheduleScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ name: string; desc: string; system: string; duration: string }>();
 
+  const { userId } = useAuth();
+  const { refresh } = useActivities();
   const [selDays, setSelDays] = useState(['Mo', 'Tu', 'We', 'Th', 'Fr']);
   const [timeOfDay, setTimeOfDay] = useState('After-school');
   const [reminder, setReminder] = useState('10 min before');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const DAY_INDEX: Record<string, number> = { Su: 0, Mo: 1, Tu: 2, We: 3, Th: 4, Fr: 5, Sa: 6 };
 
   function toggleDay(d: string) {
     setSelDays(s => s.includes(d) ? s.filter(x => x !== d) : [...s, d]);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (selDays.length === 0) {
       Alert.alert('Select days', 'Please select at least one day.');
       return;
     }
-    // TODO: persist to Supabase scheduled_activities
-    setSaved(true);
+    if (!userId) return;
+    setSaving(true);
+    try {
+      // Reuse existing activity with same name, or insert new
+      const { data: existing } = await supabase
+        .from('activities')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('name', params.name)
+        .maybeSingle();
+
+      let activityId: string;
+      if (existing) {
+        activityId = existing.id;
+      } else {
+        const { data: newAct, error: actErr } = await supabase
+          .from('activities')
+          .insert({
+            user_id: userId,
+            name: params.name,
+            description: params.desc || null,
+            sensory_system: params.system,
+            source: 'library',
+            duration: parseInt(params.duration || '10'),
+          })
+          .select('id')
+          .single();
+        if (actErr) throw actErr;
+        activityId = newAct.id;
+      }
+
+      // Compute next occurrence date for each selected day
+      const today = new Date();
+      const todayDow = today.getDay();
+      const scheduledTime = TIME_MAP[timeOfDay];
+
+      const rows = selDays.map(d => {
+        let diff = DAY_INDEX[d] - todayDow;
+        if (diff < 0) diff += 7;
+        const date = new Date(today);
+        date.setDate(today.getDate() + diff);
+        return {
+          user_id: userId,
+          activity_id: activityId,
+          scheduled_date: date.toISOString().split('T')[0],
+          scheduled_time: scheduledTime,
+          status: 'pending' as const,
+          sort_order: 0,
+          ot_sort_order: 0,
+        };
+      });
+
+      const { error: schedErr } = await supabase.from('scheduled_activities').insert(rows);
+      if (schedErr) throw schedErr;
+
+      await refresh();
+      setSaved(true);
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Failed to save activity.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (saved) {
@@ -131,8 +199,11 @@ export default function ScheduleScreen() {
         </View>
 
         {/* Save button */}
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
-          <Text style={styles.saveBtnText}>Save to diet</Text>
+        <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving} activeOpacity={0.85}>
+          {saving
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Text style={styles.saveBtnText}>Save to diet</Text>
+          }
         </TouchableOpacity>
       </ScrollView>
     </View>
