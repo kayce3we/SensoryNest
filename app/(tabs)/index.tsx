@@ -90,11 +90,16 @@ function ActivityCard({
       {/* Card */}
       <View style={styles.cardWrapper}>
         <Text style={styles.timeLabel}>{activity.time}</Text>
-        <View style={[
-          styles.card,
-          isNext && !editOrder && styles.cardNext,
-          isDone && !editOrder && styles.cardDone,
-        ]}>
+        <TouchableOpacity
+          style={[
+            styles.card,
+            isNext && !editOrder && styles.cardNext,
+            isDone && !editOrder && styles.cardDone,
+          ]}
+          onPress={isNext && !editOrder ? onMarkDone : undefined}
+          activeOpacity={isNext && !editOrder ? 0.85 : 1}
+          disabled={editOrder || (!isNext && !isDone)}
+        >
           {/* Header row */}
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle} numberOfLines={2}>{activity.name}</Text>
@@ -124,11 +129,11 @@ function ActivityCard({
           </View>
 
           {isNext && !editOrder && (
-            <TouchableOpacity style={styles.markDoneBtn} onPress={onMarkDone} activeOpacity={0.8}>
+            <View style={styles.markDoneBtn}>
               <Text style={styles.markDoneText}>Mark done ✓</Text>
-            </TouchableOpacity>
+            </View>
           )}
-        </View>
+        </TouchableOpacity>
       </View>
     </View>
   );

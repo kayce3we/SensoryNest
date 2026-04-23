@@ -26,10 +26,15 @@ export default function TabLayout() {
           borderTopColor: Colors.border,
           borderTopWidth: 1,
           height: 60 + insets.bottom,
-          paddingBottom: insets.bottom + 4,
-          paddingTop: 8,
+          paddingBottom: insets.bottom,
+          paddingTop: 0,
         },
         tabBarShowLabel: false,
+        tabBarIconStyle: {
+          flex: 1,
+          width: '100%',
+          height: '100%',
+        },
       }}
     >
       <Tabs.Screen
@@ -68,7 +73,9 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabItem: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 3,
   },
   tabLabel: {
