@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, Switch, Alert,
+  StyleSheet, Switch, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Colors, SensoryColors, type SensorySystem } from '@/constants/theme';
 import { signOut } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 const SENSORY_SYSTEMS: SensorySystem[] = [
   'Proprioceptive', 'Tactile', 'Vestibular', 'Auditory', 'Visual', 'Interoceptive',
@@ -48,16 +50,40 @@ function Field({ label, value, onChangeText, placeholder, multiline }: {
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { userId } = useAuth();
 
   const [childName, setChildName] = useState('');
   const [childAge, setChildAge] = useState('');
   const [childNotes, setChildNotes] = useState('');
-  const [otName, setOtName] = useState('Dr. Maya Patel');
+  const [otName, setOtName] = useState('');
   const [otEmail, setOtEmail] = useState('');
   const [otNextSession, setOtNextSession] = useState('');
-  const [sensoryProfile, setSensoryProfile] = useState<SensorySystem[]>(['Proprioceptive', 'Vestibular']);
+  const [sensoryProfile, setSensoryProfile] = useState<SensorySystem[]>([]);
   const [remindersEnabled, setRemindersEnabled] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase
+      .from('profiles')
+      .select('child_name, child_age, child_notes, ot_name, ot_email, ot_next_session, reminders_enabled')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setChildName(data.child_name ?? '');
+          setChildAge(data.child_age != null ? String(data.child_age) : '');
+          setChildNotes(data.child_notes ?? '');
+          setOtName(data.ot_name ?? '');
+          setOtEmail(data.ot_email ?? '');
+          setOtNextSession(data.ot_next_session ?? '');
+          setRemindersEnabled(data.reminders_enabled ?? true);
+        }
+        setLoadingProfile(false);
+      });
+  }, [userId]);
 
   function toggleSensory(system: SensorySystem) {
     setSensoryProfile(prev =>
@@ -65,9 +91,29 @@ export default function SettingsScreen() {
     );
   }
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  async function handleSave() {
+    if (!userId) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        child_name: childName || null,
+        child_age: childAge ? parseInt(childAge) : null,
+        child_notes: childNotes || null,
+        ot_name: otName || null,
+        ot_email: otEmail || null,
+        ot_next_session: otNextSession || null,
+        reminders_enabled: remindersEnabled,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+    setSaving(false);
+    if (error) {
+      Alert.alert('Error', error.message);
+    } else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   }
 
   async function handleSignOut() {
@@ -174,11 +220,15 @@ export default function SettingsScreen() {
 
         {/* Save button */}
         <TouchableOpacity
-          style={[styles.saveBtn, saved && styles.saveBtnDone]}
+          style={[styles.saveBtn, saved && styles.saveBtnDone, saving && { opacity: 0.7 }]}
           onPress={handleSave}
+          disabled={saving || loadingProfile}
           activeOpacity={0.85}
         >
-          <Text style={styles.saveBtnText}>{saved ? 'Saved ✓' : 'Save settings'}</Text>
+          {saving
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Text style={styles.saveBtnText}>{saved ? 'Saved ✓' : 'Save settings'}</Text>
+          }
         </TouchableOpacity>
 
         {/* Sign out */}
