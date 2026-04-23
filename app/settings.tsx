@@ -10,6 +10,7 @@ import { Colors, SensoryColors, type SensorySystem } from '@/constants/theme';
 import { signOut } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SENSORY_SYSTEMS: SensorySystem[] = [
   'Proprioceptive', 'Tactile', 'Vestibular', 'Auditory', 'Visual', 'Interoceptive',
@@ -85,19 +86,13 @@ export default function SettingsScreen() {
         setLoadingProfile(false);
       });
 
-    // Load columns added via migration separately so a missing column doesn't crash the whole form
-    supabase
-      .from('profiles')
-      .select('sensory_systems, reminder_offset')
-      .eq('id', userId)
-      .single()
-      .then(({ data }) => {
-        if (!data) return;
-        if ((data as any).reminder_offset) setReminderOffset((data as any).reminder_offset);
-        if ((data as any).sensory_systems?.length) {
-          setSensoryProfile((data as any).sensory_systems as SensorySystem[]);
-        }
-      });
+    // Load local preferences
+    AsyncStorage.getItem(`sensory_systems_${userId}`).then(v => {
+      if (v) setSensoryProfile(JSON.parse(v) as SensorySystem[]);
+    });
+    AsyncStorage.getItem(`reminder_offset_${userId}`).then(v => {
+      if (v) setReminderOffset(v);
+    });
   }, [userId]);
 
   function toggleSensory(system: SensorySystem) {
@@ -125,12 +120,9 @@ export default function SettingsScreen() {
       })
       .eq('id', userId);
 
-    // Save extra columns via RPC to bypass PostgREST schema cache
-    const { error: rpcError } = await supabase.rpc('save_profile_extras', {
-      p_sensory_systems: sensoryProfile,
-      p_reminder_offset: reminderOffset,
-    });
-    if (rpcError) Alert.alert('RPC Error', rpcError.message);
+    // Save preferences locally
+    await AsyncStorage.setItem(`sensory_systems_${userId}`, JSON.stringify(sensoryProfile));
+    await AsyncStorage.setItem(`reminder_offset_${userId}`, reminderOffset);
 
     setSaving(false);
     if (error) {
