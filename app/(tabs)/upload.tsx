@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -103,7 +103,11 @@ export default function UploadScreen() {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <View style={styles.header}><Text style={styles.title}>Review Activities</Text></View>
-        <View style={{ flex: 1, padding: 16 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+        >
           <StepIndicator current={2} />
           <View style={styles.foundBanner}>
             <Text style={styles.foundText}>We found {extracted.length} activities</Text>
@@ -138,7 +142,7 @@ export default function UploadScreen() {
               {saving ? 'Saving…' : `Save ${count} activities to my diet`}
             </Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </View>
     );
   }
