@@ -20,6 +20,7 @@ interface ActivitiesContextValue {
   loading: boolean;
   refresh: () => Promise<void>;
   markDone: (scheduledId: string) => Promise<void>;
+  unmarkDone: (scheduledId: string) => Promise<void>;
   moveUp: (index: number) => void;
   moveDown: (index: number) => void;
   restoreOrder: (originalOrder: string[]) => void;
@@ -97,6 +98,20 @@ export function ActivitiesProvider({ children }: { children: React.ReactNode }) 
     }
   }
 
+  async function unmarkDone(scheduledId: string) {
+    setActivities(prev => computeStatuses(prev.map(a =>
+      a.scheduledId === scheduledId ? { ...a, status: 'pending' } : a
+    )));
+    const { error } = await supabase
+      .from('scheduled_activities')
+      .update({ status: 'pending' })
+      .eq('id', scheduledId);
+    if (error) {
+      console.error('unmarkDone failed:', error.message);
+      await refresh();
+    }
+  }
+
   function moveUp(index: number) {
     if (index === 0) return;
     setActivities(prev => {
@@ -122,7 +137,7 @@ export function ActivitiesProvider({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <ActivitiesContext.Provider value={{ activities, loading, refresh, markDone, moveUp, moveDown, restoreOrder }}>
+    <ActivitiesContext.Provider value={{ activities, loading, refresh, markDone, unmarkDone, moveUp, moveDown, restoreOrder }}>
       {children}
     </ActivitiesContext.Provider>
   );

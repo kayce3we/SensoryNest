@@ -38,7 +38,7 @@ function ChevronDown({ rotated }: { rotated: boolean }) {
 
 // ── Activity card ─────────────────────────────────────────────────────────────
 function ActivityCard({
-  activity, index, total, editOrder, otIndex, onMarkDone, onMoveUp, onMoveDown,
+  activity, index, total, editOrder, otIndex, onMarkDone, onUnmarkDone, onMoveUp, onMoveDown,
 }: {
   activity: Activity;
   index: number;
@@ -46,6 +46,7 @@ function ActivityCard({
   editOrder: boolean;
   otIndex: number;
   onMarkDone: () => void;
+  onUnmarkDone: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
 }) {
@@ -95,9 +96,9 @@ function ActivityCard({
             styles.card,
             isNext && !editOrder && styles.cardNext,
             isDone && !editOrder && styles.cardDone,
-            isNext && !editOrder && pressed && { opacity: 0.75 },
+            !editOrder && pressed && { opacity: 0.75 },
           ]}
-          onPress={isNext && !editOrder ? onMarkDone : undefined}
+          onPress={editOrder ? undefined : isDone ? onUnmarkDone : onMarkDone}
         >
           {/* Header row */}
           <View style={styles.cardHeader}>
@@ -127,9 +128,11 @@ function ActivityCard({
             <Text style={styles.duration}>{activity.duration} min</Text>
           </View>
 
-          {isNext && !editOrder && (
-            <View style={styles.markDoneBtn}>
-              <Text style={styles.markDoneText}>Mark done ✓</Text>
+          {!editOrder && (
+            <View style={[styles.markDoneBtn, isDone && styles.undoneBtn]}>
+              <Text style={[styles.markDoneText, isDone && styles.undoneText]}>
+                {isDone ? 'Undo ✕' : 'Mark done ✓'}
+              </Text>
             </View>
           )}
         </Pressable>
@@ -220,7 +223,7 @@ function AddActivitySheet({ visible, onClose, onBrowse, onCreate }: {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { activities, loading, refresh, markDone, moveUp, moveDown, restoreOrder } = useActivities();
+  const { activities, loading, refresh, markDone, unmarkDone, moveUp, moveDown, restoreOrder } = useActivities();
   const [editOrder, setEditOrder] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
   const [otOrder] = useState(() => activities.map(a => a.scheduledId));
@@ -317,6 +320,7 @@ export default function HomeScreen() {
               editOrder={editOrder}
               otIndex={otOrder.indexOf(act.scheduledId)}
               onMarkDone={() => markDone(act.scheduledId)}
+              onUnmarkDone={() => unmarkDone(act.scheduledId)}
               onMoveUp={() => moveUp(i)}
               onMoveDown={() => moveDown(i)}
             />
@@ -630,11 +634,19 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     alignItems: 'center',
   },
+  undoneBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
   markDoneText: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',
     fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  undoneText: {
+    color: Colors.textSoft,
   },
   // Reorder banners
   reorderWarning: {
