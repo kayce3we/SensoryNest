@@ -69,7 +69,7 @@ export default function SettingsScreen() {
     if (!userId) return;
     supabase
       .from('profiles')
-      .select('child_name, child_age, child_notes, ot_name, ot_email, ot_next_session, sensory_systems, reminders_enabled, reminder_offset')
+      .select('child_name, child_age, child_notes, ot_name, ot_email, ot_next_session, reminders_enabled')
       .eq('id', userId)
       .single()
       .then(({ data }) => {
@@ -81,12 +81,22 @@ export default function SettingsScreen() {
           setOtEmail(data.ot_email ?? '');
           setOtNextSession(data.ot_next_session ?? '');
           setRemindersEnabled(data.reminders_enabled ?? true);
-          if (data.reminder_offset) setReminderOffset(data.reminder_offset);
-          if (data.sensory_systems?.length) {
-            setSensoryProfile(data.sensory_systems as SensorySystem[]);
-          }
         }
         setLoadingProfile(false);
+      });
+
+    // Load columns added via migration separately so a missing column doesn't crash the whole form
+    supabase
+      .from('profiles')
+      .select('sensory_systems, reminder_offset')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => {
+        if (!data) return;
+        if ((data as any).reminder_offset) setReminderOffset((data as any).reminder_offset);
+        if ((data as any).sensory_systems?.length) {
+          setSensoryProfile((data as any).sensory_systems as SensorySystem[]);
+        }
       });
   }, [userId]);
 
