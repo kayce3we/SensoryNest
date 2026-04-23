@@ -126,10 +126,11 @@ export default function SettingsScreen() {
       .eq('id', userId);
 
     // Save extra columns via RPC to bypass PostgREST schema cache
-    await supabase.rpc('save_profile_extras', {
+    const { error: rpcError } = await supabase.rpc('save_profile_extras', {
       p_sensory_systems: sensoryProfile,
       p_reminder_offset: reminderOffset,
     });
+    if (rpcError) Alert.alert('RPC Error', rpcError.message);
 
     setSaving(false);
     if (error) {
