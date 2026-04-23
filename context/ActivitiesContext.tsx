@@ -82,10 +82,19 @@ export function ActivitiesProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => { refresh(); }, [userId]);
 
   async function markDone(scheduledId: string) {
-    await supabase.from('scheduled_activities').update({ status: 'done' }).eq('id', scheduledId);
+    // Optimistically update UI first
     setActivities(prev => computeStatuses(prev.map(a =>
       a.scheduledId === scheduledId ? { ...a, status: 'done' } : a
     )));
+    const { error } = await supabase
+      .from('scheduled_activities')
+      .update({ status: 'done' })
+      .eq('id', scheduledId);
+    if (error) {
+      // Revert on failure
+      console.error('markDone failed:', error.message);
+      await refresh();
+    }
   }
 
   function moveUp(index: number) {

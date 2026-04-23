@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
-  StyleSheet, Pressable, ActivityIndicator,
+  StyleSheet, Pressable, ActivityIndicator, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -90,15 +90,14 @@ function ActivityCard({
       {/* Card */}
       <View style={styles.cardWrapper}>
         <Text style={styles.timeLabel}>{activity.time}</Text>
-        <TouchableOpacity
-          style={[
+        <Pressable
+          style={({ pressed }) => [
             styles.card,
             isNext && !editOrder && styles.cardNext,
             isDone && !editOrder && styles.cardDone,
+            isNext && !editOrder && pressed && { opacity: 0.75 },
           ]}
           onPress={isNext && !editOrder ? onMarkDone : undefined}
-          activeOpacity={isNext && !editOrder ? 0.85 : 1}
-          disabled={editOrder || (!isNext && !isDone)}
         >
           {/* Header row */}
           <View style={styles.cardHeader}>
@@ -133,7 +132,7 @@ function ActivityCard({
               <Text style={styles.markDoneText}>Mark done ✓</Text>
             </View>
           )}
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </View>
   );
