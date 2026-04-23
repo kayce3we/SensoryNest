@@ -30,16 +30,16 @@ export default function NewActivityScreen() {
   const [duration, setDuration] = useState(10);
   const [saving, setSaving] = useState(false);
 
-  async function handleSave() {
+  async function saveActivity() {
     if (!name.trim()) {
       Alert.alert('Name required', 'Please enter a name for the activity.');
-      return;
+      return null;
     }
     if (!system) {
       Alert.alert('Sensory system required', 'Please select a sensory system.');
-      return;
+      return null;
     }
-    if (!userId) return;
+    if (!userId) return null;
 
     setSaving(true);
     const { data, error } = await supabase
@@ -54,16 +54,15 @@ export default function NewActivityScreen() {
       })
       .select('id, name, description, sensory_system, duration')
       .single();
-
     setSaving(false);
 
-    if (error) {
-      Alert.alert('Error', error.message);
-      return;
-    }
+    if (error) { Alert.alert('Error', error.message); return null; }
+    return data;
+  }
 
-    await refresh();
-    // Navigate to schedule screen to add it to today's diet
+  async function handleSaveAndSchedule() {
+    const data = await saveActivity();
+    if (!data) return;
     router.replace({
       pathname: '/schedule',
       params: {
@@ -73,6 +72,12 @@ export default function NewActivityScreen() {
         duration: String(data.duration),
       },
     });
+  }
+
+  async function handleSaveToLibrary() {
+    const data = await saveActivity();
+    if (!data) return;
+    router.back();
   }
 
   return (
@@ -159,17 +164,25 @@ export default function NewActivityScreen() {
           ))}
         </View>
 
-        {/* Save */}
+        {/* Save options */}
         <TouchableOpacity
           style={[styles.saveBtn, saving && { opacity: 0.7 }]}
-          onPress={handleSave}
+          onPress={handleSaveAndSchedule}
           disabled={saving}
           activeOpacity={0.85}
         >
           {saving
             ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={styles.saveBtnText}>Save & schedule</Text>
+            : <Text style={styles.saveBtnText}>Save + schedule to diet</Text>
           }
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.saveBtnOutline, saving && { opacity: 0.7 }]}
+          onPress={handleSaveToLibrary}
+          disabled={saving}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.saveBtnOutlineText}>Save to library only</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -209,7 +222,12 @@ const styles = StyleSheet.create({
   durationTextActive: { color: Colors.dark, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
   saveBtn: {
     backgroundColor: Colors.primary, borderRadius: 12,
-    paddingVertical: 14, alignItems: 'center',
+    paddingVertical: 14, alignItems: 'center', marginBottom: 10,
   },
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
+  saveBtnOutline: {
+    borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12,
+    paddingVertical: 14, alignItems: 'center',
+  },
+  saveBtnOutlineText: { color: Colors.dark, fontSize: 15, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
 });
