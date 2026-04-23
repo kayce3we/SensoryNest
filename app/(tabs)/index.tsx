@@ -131,7 +131,7 @@ function ActivityCard({
           {!editOrder && (
             <View style={[styles.markDoneBtn, isDone && styles.undoneBtn]}>
               <Text style={[styles.markDoneText, isDone && styles.undoneText]}>
-                {isDone ? 'Undo ✕' : 'Mark done ✓'}
+                {isDone ? 'Mark undone' : 'Mark done ✓'}
               </Text>
             </View>
           )}
