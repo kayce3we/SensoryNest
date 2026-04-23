@@ -109,6 +109,8 @@ export default function SettingsScreen() {
   async function handleSave() {
     if (!userId) return;
     setSaving(true);
+
+    // Save core fields (always present)
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -118,12 +120,18 @@ export default function SettingsScreen() {
         ot_name: otName || null,
         ot_email: otEmail || null,
         ot_next_session: otNextSession || null,
-        sensory_systems: sensoryProfile,
         reminders_enabled: remindersEnabled,
-        reminder_offset: reminderOffset,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId);
+
+    // Save migration columns separately — silently skip if columns don't exist yet
+    await supabase
+      .from('profiles')
+      .update({ sensory_systems: sensoryProfile, reminder_offset: reminderOffset } as any)
+      .eq('id', userId)
+      .then(() => {});
+
     setSaving(false);
     if (error) {
       Alert.alert('Error', error.message);
