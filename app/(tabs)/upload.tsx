@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Colors } from '@/constants/theme';
 import { extractActivitiesFromPDF, type ExtractedActivity } from '@/lib/ai-extraction';
-import { createActivity, scheduleActivity } from '@/lib/activities';
+import { createActivity } from '@/lib/activities';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PROCESSING_STEPS = [
   'Uploading file',
@@ -19,10 +22,13 @@ const PROCESSING_STEPS = [
 
 export default function UploadScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { userId } = useAuth();
   const [phase, setPhase] = useState<'upload' | 'processing' | 'review'>('upload');
   const [stepDone, setStepDone] = useState(0);
   const [extracted, setExtracted] = useState<ExtractedActivity[]>([]);
+  const [otSummary, setOtSummary] = useState('');
+  const [sensoryOrder, setSensoryOrder] = useState<string[]>([]);
   const [selected, setSelected] = useState<boolean[]>([]);
   const [saving, setSaving] = useState(false);
   const spinAnim = useRef(new Animated.Value(0)).current;
@@ -51,15 +57,14 @@ export default function UploadScreen() {
     }, 700);
 
     try {
-      const apiKey = process.env.EXPO_PUBLIC_CLAUDE_API_KEY;
-      if (!apiKey) throw new Error('EXPO_PUBLIC_CLAUDE_API_KEY is not set in .env');
-
       const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
-      const activities = await extractActivitiesFromPDF(base64, apiKey);
+      const { activities, otSummary: summary, sensoryOrder: order } = await extractActivitiesFromPDF(base64);
 
       clearInterval(interval);
       setStepDone(PROCESSING_STEPS.length);
       setExtracted(activities);
+      setOtSummary(summary);
+      setSensoryOrder(order);
       setSelected(activities.map(() => true));
       setTimeout(() => setPhase('review'), 400);
     } catch (err: any) {
@@ -73,24 +78,29 @@ export default function UploadScreen() {
     if (!userId) return;
     setSaving(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
       const toSave = extracted.filter((_, i) => selected[i]);
-      for (let i = 0; i < toSave.length; i++) {
-        const a = toSave[i];
-        const activity = await createActivity({
+      for (const a of toSave) {
+        await createActivity({
           user_id: userId,
           name: a.name,
           description: a.description,
           sensory_system: a.sensory_system,
           source: 'ot',
           duration: a.duration,
-          is_library: false,
+          is_library: true,
         });
-        await scheduleActivity(userId, activity.id, today, null, i);
+      }
+      if (otSummary) {
+        await supabase.from('profiles').update({ ot_notes: otSummary }).eq('id', userId);
+      }
+      if (sensoryOrder.length > 0) {
+        await AsyncStorage.setItem(`ot_sensory_order_${userId}`, JSON.stringify(sensoryOrder));
       }
       setPhase('upload');
       setExtracted([]);
-      Alert.alert('Saved!', `${toSave.length} activities added to today's diet.`);
+      setOtSummary('');
+      setSensoryOrder([]);
+      router.replace('/(tabs)/library');
     } catch (err: any) {
       Alert.alert('Save failed', err.message);
     } finally {
@@ -139,7 +149,7 @@ export default function UploadScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.saveBtnText}>
-              {saving ? 'Saving…' : `Save ${count} activities to my diet`}
+              {saving ? 'Saving…' : `Save ${count} ${count === 1 ? 'activity' : 'activities'} to the Library`}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -188,7 +198,7 @@ export default function UploadScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <View style={styles.header}><Text style={styles.title}>Upload OT Plan</Text></View>
+      <View style={styles.header}><Text style={styles.title}>Upload Home Program</Text></View>
       <View style={{ flex: 1, padding: 16, justifyContent: 'center' }}>
         <StepIndicator current={0} />
         <TouchableOpacity style={styles.dropzone} onPress={handlePickFile} activeOpacity={0.85}>
@@ -196,7 +206,7 @@ export default function UploadScreen() {
             <Path d="M20 28V16M14 22l6-6 6 6" stroke={Colors.primary} strokeWidth="2" strokeLinecap="round" />
             <Path d="M8 30h24" stroke={Colors.primary} strokeWidth="2" strokeLinecap="round" />
           </Svg>
-          <Text style={styles.dropzoneTitle}>Upload your OT plan</Text>
+          <Text style={styles.dropzoneTitle}>Upload your home program</Text>
           <Text style={styles.dropzoneSub}>Tap to choose a PDF</Text>
           <View style={styles.chooseBtn}><Text style={styles.chooseBtnText}>Choose file</Text></View>
         </TouchableOpacity>

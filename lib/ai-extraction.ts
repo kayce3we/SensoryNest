@@ -1,4 +1,12 @@
-const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
+import { supabase } from './supabase';
+
+export interface SuggestContext {
+  childName?: string;
+  childAge?: number;
+  childNotes?: string;
+  otNotes?: string;
+  sensoryOrder?: string[];
+}
 
 export interface ExtractedActivity {
   name: string;
@@ -8,78 +16,31 @@ export interface ExtractedActivity {
   suggested_time?: string;
 }
 
-export async function extractActivitiesFromPDF(
-  pdfBase64: string,
-  apiKey: string
+export interface ExtractionResult {
+  activities: ExtractedActivity[];
+  otSummary: string;
+  sensoryOrder: string[];
+}
+
+async function invokeClaude<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('claude', { body });
+  if (error) throw new Error(data?.error ?? error.message);
+  if (data?.error) throw new Error(data.error);
+  return data as T;
+}
+
+export async function suggestActivities(
+  prompt: string,
+  context: SuggestContext,
 ): Promise<ExtractedActivity[]> {
-  const response = await fetch(CLAUDE_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-opus-4-7',
-      max_tokens: 4096,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: pdfBase64,
-              },
-            },
-            {
-              type: 'text',
-              text: `You are an occupational therapy assistant. Extract all sensory diet activities from this OT plan document.
-
-Return ONLY valid JSON — an array of activity objects with these exact fields:
-- name: string (short activity name)
-- description: string (1-2 sentence instruction for parents)
-- sensory_system: one of "Proprioceptive" | "Tactile" | "Vestibular" | "Auditory" | "Visual" | "Interoceptive"
-- duration: number (minutes, estimate if not specified)
-- suggested_time: string (e.g. "Morning", "After-school", "Bedtime" — optional)
-
-Example output:
-[
-  {
-    "name": "Weighted blanket squeeze",
-    "description": "Use the weighted blanket for deep pressure input before transitions.",
-    "sensory_system": "Proprioceptive",
-    "duration": 5,
-    "suggested_time": "Morning"
-  }
-]
-
-Extract all activities. Return only the JSON array, no other text.`,
-            },
-          ],
-        },
-      ],
-    }),
+  const { activities } = await invokeClaude<{ activities: ExtractedActivity[] }>({
+    action: 'suggest',
+    prompt,
+    context,
   });
+  return activities;
+}
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Claude API error: ${err}`);
-  }
-
-  const result = await response.json();
-  const text = result.content?.[0]?.text ?? '';
-
-  if (!text) throw new Error('Claude returned an empty response.');
-
-  // Strip markdown code fences if present
-  const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
-  // Extract JSON array even if Claude added extra text around it
-  const match = clean.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error('No activity list found in Claude response.');
-
-  return JSON.parse(match[0]) as ExtractedActivity[];
+export async function extractActivitiesFromPDF(pdfBase64: string): Promise<ExtractionResult> {
+  return invokeClaude<ExtractionResult>({ action: 'extract', pdfBase64 });
 }

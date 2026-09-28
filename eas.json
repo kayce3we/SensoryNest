@@ -1,0 +1,39 @@
+{
+  "cli": {
+    "version": ">= 18.8.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://pwjyquqvdwgawfqesnsc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3anlxdXF2ZHdnYXdmcWVzbnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4ODExNzUsImV4cCI6MjA5MjQ1NzE3NX0.E1ddRq8Gkmsc2K9eL702DDOEkEwfaTFm99hq7eVxWIg",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1043721943654-755tdv28r0dal7qp3k7e7iho0kqh8952.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "1043721943654-749qv6o57hh5jrm6oipirt8ev47t0haq.apps.googleusercontent.com"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://pwjyquqvdwgawfqesnsc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3anlxdXF2ZHdnYXdmcWVzbnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4ODExNzUsImV4cCI6MjA5MjQ1NzE3NX0.E1ddRq8Gkmsc2K9eL702DDOEkEwfaTFm99hq7eVxWIg",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1043721943654-755tdv28r0dal7qp3k7e7iho0kqh8952.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "1043721943654-749qv6o57hh5jrm6oipirt8ev47t0haq.apps.googleusercontent.com"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://pwjyquqvdwgawfqesnsc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3anlxdXF2ZHdnYXdmcWVzbnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4ODExNzUsImV4cCI6MjA5MjQ1NzE3NX0.E1ddRq8Gkmsc2K9eL702DDOEkEwfaTFm99hq7eVxWIg",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1043721943654-755tdv28r0dal7qp3k7e7iho0kqh8952.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "1043721943654-749qv6o57hh5jrm6oipirt8ev47t0haq.apps.googleusercontent.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

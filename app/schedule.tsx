@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors } from '@/constants/theme';
 import { SensoryTag } from '@/components/ui/SensoryTag';
 import type { SensorySystem } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useActivities } from '@/context/ActivitiesContext';
+import { scheduleActivityReminder, syncEmptyReminders } from '@/lib/notifications';
 
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const TIMES_OF_DAY = ['Morning', 'Pre-school', 'Midday', 'After-school', 'Evening', 'Bedtime'];
@@ -25,6 +27,28 @@ const TIME_MAP: Record<string, string> = {
   Bedtime: '8:00 PM',
 };
 
+function formatTime(date: Date): string {
+  const h = date.getHours();
+  const m = date.getMinutes();
+  const period = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${displayH}:${m.toString().padStart(2, '0')} ${period}`;
+}
+
+function parseReminderMinutes(r: string): number {
+  if (r === 'At time') return 0;
+  return parseInt(r, 10);
+}
+
+function buildScheduledDateTime(dateStr: string, timeStr: string): Date {
+  const [time, period] = timeStr.split(' ');
+  const [h, m] = time.split(':').map(Number);
+  let hours = h % 12;
+  if (period === 'PM') hours += 12;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day, hours, m || 0);
+}
+
 export default function ScheduleScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -34,7 +58,12 @@ export default function ScheduleScreen() {
   const { refresh } = useActivities();
   const [selDays, setSelDays] = useState(['Mo', 'Tu', 'We', 'Th', 'Fr']);
   const [timeOfDay, setTimeOfDay] = useState('After-school');
+  const [customTime, setCustomTime] = useState(new Date());
+  const [showAndroidPicker, setShowAndroidPicker] = useState(false);
   const [reminder, setReminder] = useState('10 min before');
+
+  const isCustom = timeOfDay === 'Custom';
+  const scheduledTime = isCustom ? formatTime(customTime) : TIME_MAP[timeOfDay];
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -83,7 +112,7 @@ export default function ScheduleScreen() {
       // Compute next occurrence date for each selected day
       const today = new Date();
       const todayDow = today.getDay();
-      const scheduledTime = TIME_MAP[timeOfDay];
+      const scheduledTime = isCustom ? formatTime(customTime) : TIME_MAP[timeOfDay];
 
       const rows = selDays.map(d => {
         let diff = DAY_INDEX[d] - todayDow;
@@ -105,6 +134,19 @@ export default function ScheduleScreen() {
       if (schedErr) throw schedErr;
 
       await refresh();
+
+      // Schedule local notification reminders
+      const minutesBefore = parseReminderMinutes(reminder);
+      const now = new Date();
+      for (const row of rows) {
+        const activityDt = buildScheduledDateTime(row.scheduled_date, scheduledTime);
+        const triggerDt = new Date(activityDt.getTime() - minutesBefore * 60_000);
+        if (triggerDt > now) {
+          scheduleActivityReminder(params.name, activityDt, minutesBefore).catch(console.error);
+        }
+      }
+
+      syncEmptyReminders(userId).catch(console.error);
       setSaved(true);
     } catch (e: any) {
       Alert.alert('Error', e.message ?? 'Failed to save activity.');
@@ -181,7 +223,50 @@ export default function ScheduleScreen() {
               <Text style={[styles.gridBtnSub, timeOfDay === t && { color: Colors.dark }]}>{TIME_MAP[t]}</Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity
+            onPress={() => {
+              setTimeOfDay('Custom');
+              if (Platform.OS === 'android') setShowAndroidPicker(true);
+            }}
+            style={[styles.gridBtn, styles.gridBtnCustom, isCustom && styles.gridBtnActive]}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.gridBtnText, isCustom && styles.gridBtnTextActive]}>Custom</Text>
+            <Text style={[styles.gridBtnSub, isCustom && { color: Colors.dark }]}>
+              {isCustom ? formatTime(customTime) : 'Pick a time'}
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Inline time picker (iOS) / Android dialog */}
+        {isCustom && Platform.OS === 'ios' && (
+          <View style={styles.timePickerWrap}>
+            <DateTimePicker
+              value={customTime}
+              mode="time"
+              display="spinner"
+              onChange={(_, date) => { if (date) setCustomTime(date); }}
+              style={{ width: '100%' }}
+            />
+          </View>
+        )}
+        {isCustom && Platform.OS === 'android' && showAndroidPicker && (
+          <DateTimePicker
+            value={customTime}
+            mode="time"
+            display="default"
+            onChange={(_, date) => {
+              setShowAndroidPicker(false);
+              if (date) setCustomTime(date);
+            }}
+          />
+        )}
+        {isCustom && Platform.OS === 'android' && !showAndroidPicker && (
+          <TouchableOpacity style={styles.androidTimeBtn} onPress={() => setShowAndroidPicker(true)} activeOpacity={0.8}>
+            <Text style={styles.androidTimeBtnText}>{formatTime(customTime)}</Text>
+            <Text style={styles.androidTimeBtnSub}>Tap to change</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Remind me */}
         <Text style={styles.sectionLabel}>Remind me</Text>
@@ -229,6 +314,11 @@ const styles = StyleSheet.create({
   gridBtnText: { fontSize: 13, fontWeight: '500', color: Colors.textMid, fontFamily: 'PlusJakartaSans_500Medium' },
   gridBtnTextActive: { color: Colors.dark, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
   gridBtnSub: { fontSize: 11, color: Colors.textSoft, marginTop: 2, fontFamily: 'PlusJakartaSans_400Regular' },
+  gridBtnCustom: { borderStyle: 'dashed' },
+  timePickerWrap: { backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.border, borderRadius: 14, marginBottom: 24, overflow: 'hidden' },
+  androidTimeBtn: { backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.primary, borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 24 },
+  androidTimeBtnText: { fontSize: 22, fontWeight: '700', color: Colors.dark, fontFamily: 'PlusJakartaSans_700Bold' },
+  androidTimeBtnSub: { fontSize: 11, color: Colors.textSoft, marginTop: 2, fontFamily: 'PlusJakartaSans_400Regular' },
   saveBtn: { backgroundColor: Colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
   successScreen: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },

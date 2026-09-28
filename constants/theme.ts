@@ -13,18 +13,19 @@ export const Colors = {
 } as const;
 
 export const SensoryColors = {
-  Proprioceptive: { bg: '#FAECE7', text: '#4A1B0C' },
-  Tactile: { bg: '#E1F5EE', text: '#085041' },
-  Vestibular: { bg: '#FAEEDA', text: '#633806' },
-  Auditory: { bg: '#E6F1FB', text: '#0C447C' },
-  Visual: { bg: '#FBEAF0', text: '#4B1528' },
-  Interoceptive: { bg: '#EAF3DE', text: '#27500A' },
+  Proprioceptive: { bg: '#FAECE7', text: '#4A1B0C', dot: '#D99476' },
+  Tactile: { bg: '#E1F5EE', text: '#085041', dot: '#5FB79D' },
+  Vestibular: { bg: '#FAEEDA', text: '#633806', dot: '#E0B155' },
+  Auditory: { bg: '#E6F1FB', text: '#0C447C', dot: '#6FA8DC' },
+  Visual: { bg: '#FBEAF0', text: '#4B1528', dot: '#D48BA6' },
+  Interoceptive: { bg: '#EAF3DE', text: '#27500A', dot: '#8FBE63' },
 } as const;
 
 export const BadgeColors = {
   ot: { bg: '#EDF2EE', text: '#4A6741' },
   library: { bg: '#EBF3F5', text: '#2C5566' },
   my: { bg: '#FAEEDA', text: '#633806' },
+  ai: { bg: '#EEE8F5', text: '#5B3F7A' },
 } as const;
 
 export type SensorySystem = keyof typeof SensoryColors;

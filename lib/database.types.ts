@@ -12,6 +12,7 @@ export interface Database {
           ot_name: string | null;
           ot_email: string | null;
           ot_next_session: string | null;
+          ot_notes: string | null;
           expo_push_token: string | null;
           reminders_enabled: boolean;
           created_at: string;
@@ -25,6 +26,7 @@ export interface Database {
           ot_name?: string | null;
           ot_email?: string | null;
           ot_next_session?: string | null;
+          ot_notes?: string | null;
           expo_push_token?: string | null;
           reminders_enabled?: boolean;
         };
@@ -35,8 +37,10 @@ export interface Database {
           ot_name?: string | null;
           ot_email?: string | null;
           ot_next_session?: string | null;
+          ot_notes?: string | null;
           expo_push_token?: string | null;
           reminders_enabled?: boolean;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -82,6 +86,7 @@ export interface Database {
           status: string;
           sort_order: number;
           ot_sort_order: number;
+          reaction: string | null;
           created_at: string;
         };
         Insert: {
@@ -93,12 +98,15 @@ export interface Database {
           status?: string;
           sort_order?: number;
           ot_sort_order?: number;
+          reaction?: string | null;
         };
         Update: {
+          scheduled_date?: string;
           scheduled_time?: string | null;
           status?: string;
           sort_order?: number;
           ot_sort_order?: number;
+          reaction?: string | null;
         };
         Relationships: [];
       };

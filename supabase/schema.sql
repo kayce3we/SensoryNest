@@ -27,7 +27,7 @@ create table public.activities (
   name text not null,
   description text,
   sensory_system text not null,
-  source text check (source in ('ot', 'library', 'my')) default 'my',
+  source text check (source in ('ot', 'library', 'my', 'ai')) default 'my',
   duration integer not null default 10,
   is_library boolean default false,
   created_at timestamptz default now()

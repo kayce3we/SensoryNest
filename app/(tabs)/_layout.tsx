@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 import { Platform, View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
-import { HomeIcon, LibraryIcon, UploadIcon, GoalsIcon, HistoryIcon } from '@/components/icons/TabIcons';
+import { HomeIcon, LibraryIcon, GoalsIcon, HistoryIcon } from '@/components/icons/TabIcons';
 
 function TabBarIcon({ Icon, focused, label }: { Icon: React.ComponentType<{ active: boolean }>; focused: boolean; label: string }) {
   return (
@@ -52,7 +52,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="upload"
         options={{
-          tabBarIcon: ({ focused }) => <TabBarIcon Icon={UploadIcon} focused={focused} label="Upload" />,
+          // Reachable from the add sheet and the Home empty state, not the tab bar —
+          // importing an OT plan is a rare task, not a daily destination.
+          href: null,
         }}
       />
       <Tabs.Screen
