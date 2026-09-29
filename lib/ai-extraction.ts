@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 
 export interface SuggestContext {
-  childName?: string;
   childAge?: number;
   childNotes?: string;
   otNotes?: string;

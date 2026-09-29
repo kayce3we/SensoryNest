@@ -38,7 +38,6 @@ async function callClaude(body: unknown): Promise<string> {
 
 function suggestBody(prompt: string, context: Record<string, unknown>) {
   const contextLines = [
-    context.childName ? `Child's name: ${context.childName}` : '',
     context.childAge ? `Child's age: ${context.childAge}` : '',
     context.childNotes ? `Sensory needs/notes: ${context.childNotes}` : '',
     context.otNotes ? `OT recommendations: ${context.otNotes}` : '',

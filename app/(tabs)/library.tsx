@@ -227,7 +227,6 @@ export default function LibraryScreen() {
     setAddedIds(new Set());
     try {
       const results = await suggestActivities(suggestPrompt, {
-        childName: childProfile.name,
         childAge: childProfile.age,
         childNotes: childProfile.notes,
         otNotes: childProfile.otNotes,
